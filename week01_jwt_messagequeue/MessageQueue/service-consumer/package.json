@@ -1,0 +1,16 @@
+{
+  "name": "service-consumer",
+  "version": "1.0.0",
+  "description": "Service Consumer - Receive and display messages from Redis",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["redis", "chat", "message-queue"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "redis": "^4.6.12"
+  }
+}
