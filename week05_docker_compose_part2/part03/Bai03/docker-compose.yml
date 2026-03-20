@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  flask1:
+    build: .
+    networks:
+      - web_net
+
+  flask2:
+    build: .
+    networks:
+      - web_net
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - flask1
+      - flask2
+    networks:
+      - web_net
+
+networks:
+  web_net:
+    driver: bridge

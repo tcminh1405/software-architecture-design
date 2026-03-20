@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  app:
+    build: ./app
+    volumes:
+      - ./app:/usr/src/app
+    ports:
+      - "3000:3000"
+    command: npm run start:dev
+
+  tests:
+    build: ./app
+    volumes:
+      - ./app:/usr/src/app
+    command: npm test

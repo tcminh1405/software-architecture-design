@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  app_a:
+    image: alpine
+    command: tail -f /dev/null
+    networks:
+      - my_network
+
+  app_b:
+    image: alpine
+    command: tail -f /dev/null
+    networks:
+      - my_network
+
+networks:
+  my_network:
+    driver: bridge
