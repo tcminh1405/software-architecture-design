@@ -1,0 +1,10 @@
+# ============================================================
+# NẶNG: node:18-slim (Debian stripped) - chưa tối ưu
+# Kích thước: ~240MB
+# ============================================================
+FROM node:18-slim
+WORKDIR /app
+COPY app/ .
+RUN npm install
+EXPOSE 3000
+CMD ["node", "index.js"]

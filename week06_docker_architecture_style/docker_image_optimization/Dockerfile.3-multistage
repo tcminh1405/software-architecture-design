@@ -1,0 +1,19 @@
+# ============================================================
+# NHẸ NHẤT: multi-stage build
+# Stage 1 (builder): cài đủ deps trên alpine
+# Stage 2 (final):   chỉ copy node_modules + source, xóa cache
+# Kích thước: ~160MB
+# ============================================================
+FROM node:18-alpine AS builder
+WORKDIR /app
+# Copy package.json trước -> Docker cache layer deps
+# Chỉ rebuild deps khi package.json thay đổi
+COPY app/package.json .
+RUN npm install --omit=dev
+
+FROM node:18-alpine AS final
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY app/index.js .
+EXPOSE 3000
+CMD ["node", "index.js"]

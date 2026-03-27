@@ -1,0 +1,10 @@
+# ============================================================
+# NHẸ HƠN: node:18-alpine thay Debian
+# Kích thước: ~180MB (nhỏ hơn 6x)
+# ============================================================
+FROM node:18-alpine
+WORKDIR /app
+COPY app/ .
+RUN npm install --omit=dev
+EXPOSE 3000
+CMD ["node", "index.js"]
