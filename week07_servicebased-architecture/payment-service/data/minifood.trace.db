@@ -1,0 +1,3 @@
+2026-04-10 14:39:39.352160+07:00 jdbc[14]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "SELECT * FROM USERS FOODS [*]FOODS"; SQL statement:
+SELECT * FROM USERS FOODS FOODS [42000-224]
