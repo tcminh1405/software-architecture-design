@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Sourcing | Time Travel Banking</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { primary: '#3b82f6', secondary: '#8b5cf6', dark: '#0a0a0a' },
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0a0a0a; color: #e2e8f0; min-height: 100vh; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .accent-gradient { background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); }
+        input[type=range] { -webkit-appearance: none; background: rgba(255,255,255,0.1); border-radius: 10px; height: 6px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: #3b82f6; cursor: pointer; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex justify-between items-end mb-12">
+            <div>
+                <h1 class="text-4xl font-bold tracking-tight">Time Travel Banking</h1>
+                <p class="text-slate-500 mt-1 font-light italic">Exercise 1 & 2: Event Sourcing Basics</p>
+            </div>
+            <div class="text-right">
+                <p id="currentTime" class="text-xs font-mono text-slate-500 uppercase tracking-widest"></p>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left: Controls -->
+            <div class="lg:col-span-4 space-y-6">
+                <section class="glass p-8 rounded-[2.5rem] shadow-2xl">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-primary"></span>
+                        New Transaction
+                    </h2>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="sendCommand('MoneyDeposited', 100)" class="bg-primary/10 hover:bg-primary text-primary hover:text-white p-4 rounded-3xl transition-all font-bold border border-primary/20">+$100</button>
+                            <button onclick="sendCommand('MoneyDeposited', 500)" class="bg-primary/10 hover:bg-primary text-primary hover:text-white p-4 rounded-3xl transition-all font-bold border border-primary/20">+$500</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="sendCommand('MoneyWithdrawn', 50)" class="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white p-4 rounded-3xl transition-all font-bold border border-red-500/20">-$50</button>
+                            <button onclick="sendCommand('MoneyWithdrawn', 200)" class="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white p-4 rounded-3xl transition-all font-bold border border-red-500/20">-$200</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="glass p-8 rounded-[2.5rem]">
+                    <h3 class="text-lg font-bold mb-4">Account Info</h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between border-b border-white/5 pb-2">
+                            <span class="text-slate-500">Owner</span>
+                            <span id="ownerName" class="font-medium">Trần Công Minh</span>
+                        </div>
+                        <div class="flex justify-between border-b border-white/5 pb-2">
+                            <span class="text-slate-500">Version</span>
+                            <span id="accVersion" class="font-mono text-primary font-bold">0</span>
+                        </div>
+                    </div>
+                    <button onclick="undo()" class="w-full mt-6 py-3 px-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                        Undo Last Event
+                    </button>
+                </section>
+            </div>
+
+            <!-- Right: State & Timeline -->
+            <div class="lg:col-span-8 space-y-8">
+                <!-- Big Balance Display -->
+                <div class="glass p-10 rounded-[3rem] relative overflow-hidden flex flex-col items-center justify-center min-h-[300px]">
+                    <div class="absolute inset-0 accent-gradient opacity-5 -z-10"></div>
+                    <p class="text-slate-400 font-light text-lg mb-2">Current Balance</p>
+                    <h2 id="balance" class="text-8xl font-black tracking-tighter text-white drop-shadow-2xl">$0</h2>
+                    <div id="loading" class="hidden absolute inset-0 glass flex items-center justify-center bg-black/40">
+                        <div class="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                </div>
+
+                <!-- Time Travel Slider -->
+                <section class="glass p-8 rounded-[2.5rem]">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold flex items-center gap-3">
+                            <span class="p-2 bg-secondary/20 rounded-xl text-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </span>
+                            Time Travel Simulator
+                        </h2>
+                        <span id="sliderValue" class="text-xs bg-white/5 px-3 py-1 rounded-full text-slate-400">Step: Head</span>
+                    </div>
+                    <input type="range" id="timeSlider" min="0" max="0" value="0" step="1" oninput="travelTime(this.value)" class="w-full cursor-pointer">
+                    <div class="flex justify-between mt-2 text-[10px] text-slate-500 font-mono uppercase tracking-tighter">
+                        <span>Genesis</span>
+                        <span>Now</span>
+                    </div>
+                </section>
+
+                <!-- Event Log -->
+                <section class="glass p-8 rounded-[2.5rem]">
+                    <h3 class="font-bold mb-4 flex items-center gap-2">
+                        Event Stream
+                        <span id="eventBadge" class="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full">0 events</span>
+                    </h3>
+                    <div id="eventLog" class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        <!-- Events -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:5001/account';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchState();
+            fetchEvents();
+            updateTime();
+            setInterval(updateTime, 1000);
+        });
+
+        async function fetchState(index = undefined) {
+            document.getElementById('loading').classList.remove('hidden');
+            const url = index !== undefined ? `${API}/state?index=${index}` : `${API}/state`;
+            try {
+                const res = await fetch(url);
+                const result = await res.json();
+                
+                document.getElementById('balance').innerText = `$${result.state.balance.toLocaleString()}`;
+                document.getElementById('accVersion').innerText = result.state.version;
+                document.getElementById('sliderValue').innerText = index === undefined ? 'Step: Head' : `Step: ${index + 1} / ${result.totalEvents}`;
+                
+                // Update slider max
+                const slider = document.getElementById('timeSlider');
+                if (index === undefined) {
+                    slider.max = result.totalEvents > 0 ? result.totalEvents - 1 : 0;
+                    slider.value = slider.max;
+                }
+            } catch (err) { console.error(err); }
+            finally { document.getElementById('loading').classList.add('hidden'); }
+        }
+
+        async function fetchEvents() {
+            try {
+                const res = await fetch(`${API}/events`);
+                const result = await res.json();
+                const log = document.getElementById('eventLog');
+                document.getElementById('eventBadge').innerText = `${result.data.length} events`;
+                
+                log.innerHTML = result.data.map((e, idx) => `
+                    <div class="flex items-center gap-4 p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors group">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center bg-dark text-[10px] font-bold text-slate-500">${idx + 1}</div>
+                        <div class="flex-1">
+                            <p class="text-sm font-bold ${getEventTypeColor(e.type)}">${e.type}</p>
+                            <p class="text-[10px] text-slate-500 uppercase">${new Date(e.occurredAt).toLocaleTimeString()}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-black text-slate-300">${getEventPayload(e)}</p>
+                        </div>
+                    </div>
+                `).reverse().join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function sendCommand(type, amount) {
+            // First event must be AccountCreated if no events exist
+            const eventsRes = await fetch(`${API}/events`);
+            const eventsData = await eventsRes.json();
+            
+            if (eventsData.data.length === 0) {
+                await fetch(`${API}/commands`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'AccountCreated', payload: { owner: 'Trần Công Minh', initialBalance: amount } })
+                });
+            } else {
+                await fetch(`${API}/commands`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, payload: { amount } })
+                });
+            }
+            fetchState();
+            fetchEvents();
+        }
+
+        async function undo() {
+            await fetch(`${API}/undo`, { method: 'POST' });
+            fetchState();
+            fetchEvents();
+        }
+
+        function travelTime(val) {
+            fetchState(parseInt(val));
+        }
+
+        function getEventTypeColor(type) {
+            if (type === 'AccountCreated') return 'text-primary';
+            if (type === 'MoneyDeposited') return 'text-green-400';
+            if (type === 'MoneyWithdrawn') return 'text-red-400';
+            return 'text-slate-400';
+        }
+
+        function getEventPayload(e) {
+            if (e.type === 'AccountCreated') return `+$${e.payload.initialBalance}`;
+            return (e.type === 'MoneyDeposited' ? '+' : '-') + `$${e.payload.amount}`;
+        }
+
+        function updateTime() {
+            document.getElementById('currentTime').innerText = new Date().toLocaleString();
+        }
+    </script>
+</body>
+</html>

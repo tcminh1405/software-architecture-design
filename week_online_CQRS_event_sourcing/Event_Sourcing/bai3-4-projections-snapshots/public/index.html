@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ES Optimization | Projections & Snapshots</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { primary: '#f59e0b', secondary: '#10b981', dark: '#0a0a0a' },
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0a0a0a; color: #e2e8f0; min-height: 100vh; font-family: 'Outfit', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .snapshot-node { position: relative; }
+        .snapshot-node::before { content: ''; position: absolute; left: -20px; top: 50%; width: 15px; height: 1px; background: rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-12">
+            <h1 class="text-4xl font-bold tracking-tight text-primary">ES Optimization Engine</h1>
+            <p class="text-slate-500 mt-1 font-light italic">Exercise 3 & 4: Projections (Read Model) & Snapshots</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left: Transaction Center -->
+            <div class="space-y-6">
+                <section class="glass p-8 rounded-[2.5rem] border-primary/20 shadow-2xl shadow-primary/5">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+                        Command Center
+                    </h2>
+                    <div class="space-y-4">
+                        <button onclick="sendTx('MoneyDeposited', 1000)" class="w-full bg-primary hover:bg-amber-500 text-black font-extrabold py-4 rounded-3xl transition-all shadow-lg shadow-primary/20">DEPOSIT $1,000</button>
+                        <button onclick="sendTx('MoneyWithdrawn', 500)" class="w-full bg-white/5 hover:bg-white/10 border border-white/10 py-4 rounded-3xl transition-all font-bold">WITHDRAW $500</button>
+                    </div>
+                    <div class="mt-8 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                        <p class="text-[10px] uppercase font-black tracking-widest text-primary mb-2">System Config</p>
+                        <p class="text-xs text-slate-400">Snapshot Threshold: <span class="text-white font-bold font-mono">5 Events</span></p>
+                    </div>
+                </section>
+
+                <!-- Projection View -->
+                <section class="glass p-8 rounded-[2.5rem]">
+                    <h3 class="text-lg font-bold mb-6 text-secondary flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Read Model Summary
+                    </h3>
+                    <div id="projectionData" class="space-y-4">
+                        <!-- Dynamic -->
+                        <p class="text-slate-600 text-sm italic">Loading projection...</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right: Performance & Visualizer -->
+            <div class="lg:col-span-2 space-y-8">
+                <!-- Optimization Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass p-8 rounded-[2.5rem] flex flex-col justify-center">
+                        <p class="text-slate-500 text-xs uppercase font-bold tracking-widest mb-1">Optimized Balance</p>
+                        <h2 id="balance" class="text-5xl font-black text-white">$0</h2>
+                    </div>
+                    <div class="glass p-8 rounded-[2.5rem] bg-secondary/5 border-secondary/20">
+                        <p class="text-secondary text-xs uppercase font-bold tracking-widest mb-1">Snapshot Efficiency</p>
+                        <div class="flex items-baseline gap-2">
+                            <h2 id="execTime" class="text-5xl font-black text-white">0.0</h2>
+                            <span class="text-slate-500 text-sm">ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Replay Visualizer -->
+                <section class="glass p-8 rounded-[3rem]">
+                    <h2 class="text-xl font-bold mb-8 flex items-center justify-between">
+                        Replay Visualizer
+                        <span id="replayMethod" class="text-[10px] border border-white/10 px-3 py-1 rounded-full text-slate-500 italic">Method: Full Replay</span>
+                    </h2>
+                    
+                    <div class="relative flex items-center gap-4 py-10 overflow-x-auto custom-scrollbar">
+                        <div class="flex-shrink-0 w-32 h-32 rounded-3xl bg-slate-800 flex flex-col items-center justify-center border-2 border-dashed border-slate-700">
+                            <span class="text-[10px] text-slate-500 uppercase">Genesis</span>
+                        </div>
+                        
+                        <div id="visualStream" class="flex items-center gap-4">
+                            <!-- Dynamic Event Chain -->
+                        </div>
+                    </div>
+                </section>
+
+                <section class="glass p-8 rounded-[2.5rem]">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold">System Metrics</h3>
+                        <button onclick="fetchOptimized()" class="text-xs text-primary hover:underline">Recalculate Now</button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-8">
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Total Events</p>
+                            <p id="totalEvents" class="text-2xl font-bold">0</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Snapshot Version</p>
+                            <p id="snapshotVer" class="text-2xl font-bold">-</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Events Replayed</p>
+                            <p id="eventsReplayed" class="text-2xl font-bold text-secondary">0</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:5002';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initAccount();
+            refreshAll();
+            setInterval(refreshAll, 3000);
+        });
+
+        async function initAccount() {
+            // Check if any data exists
+            const res = await fetch(`${API}/summary`);
+            const data = await res.json();
+            if (!data.data) {
+                await fetch(`${API}/commands`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'AccountCreated', payload: { owner: 'Corporate Account', initialBalance: 10000 } })
+                });
+            }
+        }
+
+        async function refreshAll() {
+            await fetchSummary();
+            await fetchOptimized();
+        }
+
+        async function fetchSummary() {
+            try {
+                const res = await fetch(`${API}/summary`);
+                const result = await res.json();
+                const container = document.getElementById('projectionData');
+                const s = result.data;
+                
+                if (!s) return;
+
+                container.innerHTML = `
+                    <div class="space-y-4 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Balance (O(1))</span>
+                            <span class="font-black text-secondary">$${s.balance.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Total Deposits</span>
+                            <span class="font-bold">$${s.totalDeposits.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Transactions</span>
+                            <span class="font-bold">${s.transactionCount}</span>
+                        </div>
+                        <div class="pt-4 text-[10px] text-slate-600 border-t border-white/5 uppercase">
+                            Last Updated: ${new Date(s.lastUpdated).toLocaleTimeString()}
+                        </div>
+                    </div>
+                `;
+            } catch (err) { console.error(err); }
+        }
+
+        async function fetchOptimized() {
+            try {
+                const res = await fetch(`${API}/balance/optimized`);
+                const result = await res.json();
+                
+                document.getElementById('balance').innerText = `$${result.balance.toLocaleString()}`;
+                document.getElementById('execTime').innerText = result.stats.executionTimeMs;
+                document.getElementById('totalEvents').innerText = result.stats.totalEvents;
+                document.getElementById('snapshotVer').innerText = result.stats.usedSnapshot ? result.stats.snapshotVersion : '-';
+                document.getElementById('eventsReplayed').innerText = result.stats.eventsReplayed;
+                document.getElementById('replayMethod').innerText = result.stats.usedSnapshot ? `Method: Snapshot Replay (v${result.stats.snapshotVersion})` : 'Method: Full Replay';
+
+                // Update Viz
+                updateVisualizer(result.stats);
+            } catch (err) { console.error(err); }
+        }
+
+        function updateVisualizer(stats) {
+            const container = document.getElementById('visualStream');
+            let html = '';
+            
+            // Show Snapshot node if used
+            if (stats.usedSnapshot) {
+                html += `
+                    <div class="flex-shrink-0 w-24 h-24 rounded-3xl bg-secondary/20 border-2 border-secondary/50 flex flex-col items-center justify-center">
+                        <span class="text-[8px] font-black uppercase text-secondary">Snapshot</span>
+                        <span class="text-lg font-bold">v${stats.snapshotVersion}</span>
+                    </div>
+                    <div class="text-slate-600">➜</div>
+                `;
+            }
+
+            // Show Replayed Events
+            for(let i=0; i < stats.eventsReplayed; i++) {
+                html += `
+                    <div class="flex-shrink-0 w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                        <div class="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
+                    </div>
+                    ${i < stats.eventsReplayed - 1 ? '<div class="text-slate-800 text-[10px]">➜</div>' : ''}
+                `;
+            }
+
+            if (stats.eventsReplayed === 0 && !stats.usedSnapshot) {
+                html = '<p class="text-slate-700 italic ml-4">Waiting for events...</p>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        async function sendTx(type, amount) {
+            try {
+                await fetch(`${API}/commands`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, payload: { amount } })
+                });
+                refreshAll();
+            } catch (err) { console.error(err); }
+        }
+    </script>
+</body>
+</html>

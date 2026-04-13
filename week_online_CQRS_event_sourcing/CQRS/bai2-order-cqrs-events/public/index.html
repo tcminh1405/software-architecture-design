@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order System Dashboard | CQRS + Events</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#a855f7',
+                        accent: '#ec4899',
+                        dark: '#0f172a',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glow-shadow {
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+        .animate-pulse-slow {
+            animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.1; }
+            50% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body class="text-slate-200">
+    <div class="fixed top-0 left-0 w-full h-full pointer-events-none -z-10">
+        <div class="absolute top-[10%] left-[5%] w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse-slow"></div>
+        <div class="absolute bottom-[20%] right-[10%] w-80 h-80 bg-secondary/10 rounded-full blur-[100px] animate-pulse-slow"></div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-10">
+            <div>
+                <h1 class="text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">Order Dashboard</h1>
+                <p class="text-slate-400 mt-2 font-light tracking-wide">CQRS Pattern + Domain Events Architecture</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="connectionStatus" class="flex items-center gap-2 bg-green-500/10 text-green-400 px-4 py-2 rounded-full border border-green-500/20 text-sm font-medium">
+                    <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                    Live Sync Active
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left Side: CRUD Form & Info -->
+            <div class="lg:col-span-4 space-y-8">
+                <!-- Create Order Section -->
+                <section class="glass rounded-3xl p-8 glow-shadow">
+                    <h2 class="text-2xl font-semibold mb-6 flex items-center gap-3">
+                        <span class="p-2 bg-primary/20 rounded-lg text-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6h-6" />
+                            </svg>
+                        </span>
+                        New Command
+                    </h2>
+                    <form id="orderForm" class="space-y-5">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-slate-400 ml-1">Customer ID</label>
+                            <input type="text" id="customerId" placeholder="CUST-001" required
+                                class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all duration-300">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-slate-400 ml-1">Customer Name</label>
+                            <input type="text" id="customerName" placeholder="Nguyen Van A" required
+                                class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all duration-300">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-slate-400 ml-1">Items (JSON Array)</label>
+                            <textarea id="itemsJson" rows="3" required
+                                class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all duration-300 text-sm font-mono">[
+  {"productId": "P01", "productName": "Laptop", "quantity": 1, "price": 20000000}
+]</textarea>
+                        </div>
+                        <button type="submit" 
+                            class="w-full bg-gradient-to-r from-primary to-secondary hover:from-secondary hover:to-accent text-white font-bold py-4 rounded-2xl shadow-lg transition-all duration-500 transform hover:scale-[1.02] active:scale-95 flex justify-center items-center gap-2">
+                            Send CreateOrder Command
+                        </button>
+                    </form>
+                </section>
+
+                <!-- Architecture Visualization -->
+                <section class="glass rounded-3xl p-8">
+                    <h3 class="text-lg font-semibold mb-4 text-slate-300">Architecture Info</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold">W</div>
+                            <div>
+                                <p class="text-sm font-medium">Write Store (Command)</p>
+                                <p class="text-xs text-slate-500">Normalised Data DB</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400 font-bold">E</div>
+                            <div>
+                                <p class="text-sm font-medium">Event Bus (Pub/Sub)</p>
+                                <p class="text-xs text-slate-500">Message Transport</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 font-bold">R</div>
+                            <div>
+                                <p class="text-sm font-medium">Read Store (Query)</p>
+                                <p class="text-xs text-slate-500">Denormalised View</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Side: Order Dashboard & Event Feed -->
+            <div class="lg:col-span-8 space-y-8">
+                <!-- Orders Table -->
+                <section class="glass rounded-3xl p-8 min-h-[500px]">
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-2xl font-semibold flex items-center gap-3">
+                            <span class="p-2 bg-secondary/20 rounded-lg text-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                </svg>
+                            </span>
+                            Current Orders (Query Side)
+                        </h2>
+                        <button onclick="refreshOrders()" class="p-2 hover:bg-white/5 rounded-full transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-slate-500 border-b border-white/5">
+                                    <th class="pb-4 font-medium pl-2">OrderID</th>
+                                    <th class="pb-4 font-medium">Customer</th>
+                                    <th class="pb-4 font-medium">Status</th>
+                                    <th class="pb-4 font-medium text-right">Total Amount</th>
+                                    <th class="pb-4 font-medium text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orderList" class="divide-y divide-white/5">
+                                <!-- Dynamic Content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Event Log Feed -->
+                <section class="glass rounded-3xl p-8">
+                    <h2 class="text-2xl font-semibold mb-6 flex items-center gap-3">
+                        <span class="p-2 bg-accent/20 rounded-lg text-accent">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </span>
+                        Domain Events Feed
+                    </h2>
+                    <div id="eventFeed" class="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        <!-- Dynamic Events -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="fixed bottom-8 right-8 transform translate-y-20 opacity-0 transition-all duration-500 scale-95 glass glow-shadow p-6 rounded-3xl border border-white/10 flex items-center gap-4 z-50">
+        <div id="notifIcon" class="w-10 h-10 rounded-full flex items-center justify-center"></div>
+        <div>
+            <p id="notifTitle" class="font-bold"></p>
+            <p id="notifMsg" class="text-sm text-slate-400"></p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/orders';
+
+        // Initial Load
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshOrders();
+            refreshEvents();
+            setInterval(() => {
+                refreshOrders();
+                refreshEvents();
+            }, 3000);
+        });
+
+        // Handle Form Submit
+        document.getElementById('orderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const customerId = document.getElementById('customerId').value;
+            const customerName = document.getElementById('customerName').value;
+            const items = JSON.parse(document.getElementById('itemsJson').value);
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customerId, customerName, items })
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    showNotification('Success', 'OrderCreated Command Sent', 'success');
+                    document.getElementById('orderForm').reset();
+                    document.getElementById('itemsJson').value = '[\n  {"productId": "P01", "productName": "Laptop", "quantity": 1, "price": 20000000}\n]';
+                    setTimeout(() => {
+                        refreshOrders();
+                        refreshEvents();
+                    }, 500);
+                } else {
+                    showNotification('Error', result.message, 'error');
+                }
+            } catch (err) {
+                showNotification('Error', 'Failed to send command', 'error');
+            }
+        });
+
+        async function refreshOrders() {
+            try {
+                const res = await fetch(API_URL);
+                const result = await res.json();
+                const list = document.getElementById('orderList');
+                
+                if (result.data.length === 0) {
+                    list.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-500 italic">No orders in read store yet</td></tr>';
+                    return;
+                }
+
+                list.innerHTML = result.data.map(order => `
+                    <tr class="hover:bg-white/5 transition-colors">
+                        <td class="py-4 pl-2">
+                            <span class="font-mono text-xs text-primary bg-primary/10 px-2 py-1 rounded-md">#${order.id.split('-')[0]}</span>
+                        </td>
+                        <td class="py-4">
+                            <p class="font-semibold">${order.customerName}</p>
+                            <p class="text-xs text-slate-500">${order.customerId}</p>
+                        </td>
+                        <td class="py-4">
+                            <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusStyle(order.status)}">
+                                ${order.status}
+                            </span>
+                        </td>
+                        <td class="py-4 text-right font-mono font-bold text-slate-100">
+                            ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalAmount)}
+                        </td>
+                        <td class="py-4 text-center">
+                            ${order.status !== 'cancelled' ? `
+                                <button onclick="cancelOrder('${order.id}')" class="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            ` : '-'}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function refreshEvents() {
+            try {
+                const res = await fetch(`${API_URL}/events`);
+                const result = await res.json();
+                const feed = document.getElementById('eventFeed');
+                
+                feed.innerHTML = result.data.map(event => `
+                    <div class="p-4 bg-white/5 border-l-4 border-accent rounded-r-xl transition-all hover:translate-x-1 duration-300">
+                        <div class="flex justify-between items-start mb-1">
+                            <p class="text-accent font-bold text-sm tracking-widest uppercase">${event.eventType}</p>
+                            <span class="text-[10px] text-slate-500 font-light">${new Date(event.occurredAt).toLocaleTimeString()}</span>
+                        </div>
+                        <p class="text-xs text-slate-300">AggregateID: <span class="text-slate-500 font-mono">${event.aggregateId}</span></p>
+                    </div>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function cancelOrder(id) {
+            try {
+                const res = await fetch(`${API_URL}/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: 'UI Cancel' })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showNotification('Alert', 'OrderCancelled Command Sent', 'warning');
+                    refreshOrders();
+                    refreshEvents();
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        function getStatusStyle(status) {
+            switch(status) {
+                case 'pending': return 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20';
+                case 'confirmed': return 'bg-green-500/10 text-green-400 border border-green-500/20';
+                case 'cancelled': return 'bg-red-500/10 text-red-400 border border-red-500/20';
+                default: return 'bg-slate-500/10 text-slate-400';
+            }
+        }
+
+        function showNotification(title, msg, type) {
+            const notif = document.getElementById('notification');
+            const icon = document.getElementById('notifIcon');
+            const titleEl = document.getElementById('notifTitle');
+            const msgEl = document.getElementById('notifMsg');
+
+            titleEl.innerText = title;
+            msgEl.innerText = msg;
+
+            if (type === 'success') {
+                icon.className = 'w-10 h-10 rounded-full flex items-center justify-center bg-green-500/20 text-green-400';
+                icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
+            } else if (type === 'warning') {
+                icon.className = 'w-10 h-10 rounded-full flex items-center justify-center bg-yellow-500/20 text-yellow-400';
+                icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>';
+            } else {
+                icon.className = 'w-10 h-10 rounded-full flex items-center justify-center bg-red-500/20 text-red-400';
+                icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>';
+            }
+
+            notif.classList.remove('translate-y-20', 'opacity-0');
+            notif.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                notif.classList.add('translate-y-20', 'opacity-0');
+                notif.classList.remove('translate-y-0', 'opacity-100');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

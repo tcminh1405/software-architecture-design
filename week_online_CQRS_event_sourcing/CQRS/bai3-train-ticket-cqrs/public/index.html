@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Ticket Booking | CQRS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0ea5e9',
+                        secondary: '#6366f1',
+                        dark: '#0f172a',
+                    },
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0f172a; min-height: 100vh; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .train-track { border-left: 2px dashed rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body class="text-slate-200">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <header class="mb-12 text-center">
+            <h1 class="text-5xl font-bold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Train Ticket System</h1>
+            <p class="text-slate-400 mt-4 text-lg">Optimized Search (Query) + Validated Booking (Command)</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <!-- Search Side (Query) -->
+            <div class="lg:col-span-1 space-y-6">
+                <section class="glass p-6 rounded-3xl">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        Search Trips
+                    </h2>
+                    <div class="space-y-4">
+                        <input type="text" id="from" placeholder="From (e.g. Hanoi)" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary transition-all">
+                        <input type="text" id="to" placeholder="To (e.g. Saigon)" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary transition-all">
+                        <button onclick="searchTrips()" class="w-full bg-primary hover:bg-primary/80 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-primary/20">Find My Trip</button>
+                    </div>
+                </section>
+
+                <section class="glass p-6 rounded-3xl">
+                    <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500 mb-4">Query Optimization</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed font-light">The search functionality uses a dedicated <strong>TicketViewService</strong>, isolated from the complex validation logic of the command side.</p>
+                </section>
+            </div>
+
+            <!-- Results Side -->
+            <div class="lg:col-span-2 space-y-8">
+                <!-- Trip Results -->
+                <div id="tripResults" class="grid gap-4">
+                    <!-- Dynamic -->
+                </div>
+
+                <!-- Tickets List -->
+                <section class="mt-12">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                        </svg>
+                        My Booked Tickets
+                    </h2>
+                    <div id="ticketList" class="grid gap-4">
+                        <!-- Dynamic -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Modal (Simple) -->
+    <div id="bookingModal" class="fixed inset-0 bg-dark/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="glass p-8 rounded-3xl max-w-md w-full border border-white/20">
+            <h2 class="text-2xl font-bold mb-2">Book Your Ticket</h2>
+            <p id="modalTripInfo" class="text-slate-400 text-sm mb-6"></p>
+            <div class="space-y-4">
+                <input type="text" id="passengerName" placeholder="Passenger Name" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary transition-all">
+                <div class="flex gap-4 pt-2">
+                    <button onclick="closeModal()" class="flex-1 px-4 py-3 hover:bg-white/5 rounded-xl transition-all text-slate-400">Cancel</button>
+                    <button onclick="confirmBooking()" class="flex-1 bg-secondary hover:bg-secondary/80 text-white font-bold px-4 py-3 rounded-xl transition-all shadow-lg shadow-secondary/20">Confirm Booking</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedTripId = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            searchTrips();
+            refreshTickets();
+        });
+
+        async function searchTrips() {
+            const from = document.getElementById('from').value;
+            const to = document.getElementById('to').value;
+            try {
+                const res = await fetch(`/trips?from=${from}&to=${to}`);
+                const result = await res.json();
+                const container = document.getElementById('tripResults');
+                
+                if (result.data.length === 0) {
+                    container.innerHTML = '<div class="glass p-8 text-center text-slate-500 rounded-3xl italic">No trips found. Try "Hanoi" or "Saigon".</div>';
+                    return;
+                }
+
+                container.innerHTML = result.data.map(trip => `
+                    <div class="glass p-6 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-6 border-l-8 border-primary group hover:bg-white/[0.05] transition-all duration-300">
+                        <div class="flex items-center gap-6">
+                            <div class="text-center font-bold">
+                                <p class="text-3xl text-primary">${trip.trainNumber}</p>
+                                <p class="text-[10px] text-slate-500 uppercase tracking-widest">Train No.</p>
+                            </div>
+                            <div class="train-track pl-6">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-lg font-semibold">${trip.from}</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                    </svg>
+                                    <span class="text-lg font-semibold">${trip.to}</span>
+                                </div>
+                                <p class="text-sm text-slate-500 font-light translate-x-1">${new Date(trip.departureTime).toLocaleString('vi-VN')}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="text-xl font-bold ${trip.availableSeats > 0 ? 'text-green-400' : 'text-red-400'}">${trip.availableSeats}</p>
+                                <p class="text-[10px] text-slate-500 uppercase">Seats Left</p>
+                            </div>
+                            <button onclick="openBookingModal('${trip.id}', '${trip.trainNumber}')" 
+                                class="bg-white/5 hover:bg-primary hover:text-white border border-white/10 px-6 py-2 rounded-xl transition-all font-bold ${trip.availableSeats <= 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+                                ${trip.availableSeats <= 0 ? 'disabled' : ''}>
+                                ${trip.availableSeats > 0 ? 'Select' : 'Full'}
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function refreshTickets() {
+            try {
+                const res = await fetch('/tickets');
+                const result = await res.json();
+                const container = document.getElementById('ticketList');
+                
+                if (result.data.length === 0) {
+                    container.innerHTML = '<p class="text-slate-600 italic">No tickets booked yet.</p>';
+                    return;
+                }
+
+                container.innerHTML = result.data.map(ticket => `
+                    <div class="glass p-4 rounded-2xl flex justify-between items-center bg-secondary/5 border border-secondary/10">
+                        <div>
+                            <p class="font-bold text-secondary">Ticket #${ticket.id.split('-')[0]}</p>
+                            <p class="text-sm">${ticket.passengerName} - Seat ${ticket.seatNumber}</p>
+                        </div>
+                        <div class="text-right flex items-center gap-4">
+                            <span class="text-[10px] uppercase font-bold px-2 py-1 rounded ${ticket.status === 'booked' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                                ${ticket.status}
+                            </span>
+                            ${ticket.status === 'booked' ? `
+                                <button onclick="cancelTicket('${ticket.id}')" class="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        function openBookingModal(id, trainNo) {
+            selectedTripId = id;
+            document.getElementById('modalTripInfo').innerText = `Booking for Train ${trainNo}`;
+            document.getElementById('bookingModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('bookingModal').classList.add('hidden');
+            document.getElementById('passengerName').value = '';
+        }
+
+        async function confirmBooking() {
+            const name = document.getElementById('passengerName').value;
+            if (!name) return alert('Please enter name');
+
+            try {
+                const res = await fetch('/tickets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tripId: selectedTripId, passengerName: name })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    closeModal();
+                    searchTrips();
+                    refreshTickets();
+                } else {
+                    alert(result.message);
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function cancelTicket(id) {
+            try {
+                const res = await fetch(`/tickets/${id}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.success) {
+                    searchTrips();
+                    refreshTickets();
+                }
+            } catch (err) { console.error(err); }
+        }
+    </script>
+</body>
+</html>

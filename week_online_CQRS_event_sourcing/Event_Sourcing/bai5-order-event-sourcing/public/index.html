@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order ES + CQRS Dashboard | Bài 5</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { primary: '#ec4899', secondary: '#8b5cf6', dark: '#0a0a0a' },
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0a0a0a; color: #e2e8f0; min-height: 100vh; font-family: 'Outfit', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .gradient-border { border-left: 4px solid; border-image: linear-gradient(to bottom, #ec4899, #8b5cf6) 1; }
+        .item-row { border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-12 flex justify-between items-center">
+            <div>
+                <h1 class="text-4xl font-black tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent italic">ORDER SOURCE</h1>
+                <p class="text-slate-500 font-light mt-1">Full Event Sourcing + CQRS Read Models</p>
+            </div>
+            <div id="syncIndicator" class="hidden flex items-center gap-2 bg-secondary/10 text-secondary px-4 py-2 rounded-full border border-secondary/20 text-xs font-bold animate-pulse">
+                <span class="w-2 h-2 bg-secondary rounded-full"></span>
+                PROJECTION SYNCING
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left: Command Side -->
+            <div class="lg:col-span-4 space-y-8">
+                <section class="glass p-8 rounded-[3rem] shadow-2xl">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                        <span class="p-2 bg-primary/20 rounded-xl text-primary font-black uppercase text-[10px]">Write</span>
+                        Command Dispatcher
+                    </h2>
+                    
+                    <div id="createOrderSection" class="space-y-4">
+                        <input type="text" id="custName" placeholder="Customer Name" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 outline-none focus:border-primary transition-all">
+                        <button onclick="createOrder()" class="w-full bg-primary hover:bg-pink-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95">INITIATE NEW ORDER</button>
+                    </div>
+
+                    <div id="manageOrderSection" class="hidden space-y-6 pt-6 border-t border-white/5 mt-6">
+                        <div class="p-4 bg-white/5 rounded-2xl border border-white/10">
+                            <p class="text-[10px] text-slate-500 uppercase font-black tracking-tighter mb-1">Active order</p>
+                            <p id="activeOrderId" class="text-xs font-mono text-primary truncate"></p>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="addItem('Phone', 800)" class="bg-white/5 hover:bg-white/10 p-3 rounded-xl text-xs font-bold">+ Phone ($800)</button>
+                                <button onclick="addItem('Mac', 2000)" class="bg-white/5 hover:bg-white/10 p-3 rounded-xl text-xs font-bold">+ Mac ($2000)</button>
+                            </div>
+                            <button onclick="removeItem('Phone')" class="w-full text-xs text-slate-500 hover:text-red-400 py-1">- Remove Phone</button>
+                            <button onclick="confirmOrder()" class="w-full bg-secondary hover:bg-violet-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-secondary/20 transition-all mt-4">CONFIRM ORDER</button>
+                        </div>
+                        
+                        <button onclick="resetUI()" class="w-full text-[10px] text-slate-600 uppercase hover:underline">New Booking Session</button>
+                    </div>
+                </section>
+
+                <!-- Architecture Explain -->
+                <div class="glass p-8 rounded-[2.5rem] text-sm text-slate-500 leading-relaxed font-light">
+                    <p class="font-bold text-slate-300 mb-2">Event Sourcing Rule:</p>
+                    <p>Unlike the traditional CRUD, here we never store "Total Price" or "Status" directly. Every single button click above generates a permanent <strong>Domain Event</strong>. The dashboard on the right is a <strong>Read Model</strong> built by projecting those events.</p>
+                </div>
+            </div>
+
+            <!-- Right: Read Model Side -->
+            <div class="lg:col-span-8 space-y-8">
+                <!-- Projections Dashboard -->
+                <section class="glass p-10 rounded-[3rem]">
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-2xl font-bold flex items-center gap-3">
+                            <span class="p-2 bg-secondary/20 rounded-xl text-secondary font-black uppercase text-[10px]">Read</span>
+                            Orders Dashboard
+                        </h2>
+                        <button onclick="refreshOrders()" class="text-slate-500 hover:text-white transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div id="orderGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Dynamic View Models -->
+                    </div>
+                </section>
+
+                <!-- Universal Event Log -->
+                <section class="glass p-10 rounded-[3rem]">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                        <span class="p-2 bg-slate-800 rounded-xl text-slate-400 font-black uppercase text-[10px]">Log</span>
+                        Global Event Stream
+                    </h2>
+                    <div id="globalLog" class="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-4">
+                        <!-- All events -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:5003';
+        let currentOrderId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshOrders();
+            setInterval(refreshOrders, 3000);
+        });
+
+        async function createOrder() {
+            const name = document.getElementById('custName').value;
+            if (!name) return alert('Enter name');
+            
+            const res = await callCommand('OrderCreated', null, { customerName: name });
+            if (res.success) {
+                currentOrderId = res.orderId;
+                document.getElementById('activeOrderId').innerText = res.orderId;
+                document.getElementById('createOrderSection').classList.add('hidden');
+                document.getElementById('manageOrderSection').classList.remove('hidden');
+                showSync();
+                refreshOrders();
+            }
+        }
+
+        async function addItem(name, price) {
+            await callCommand('ItemAdded', currentOrderId, { 
+                productId: 'P-'+Math.floor(Math.random()*100), 
+                name, 
+                price, 
+                quantity: 1 
+            });
+            showSync();
+            refreshOrders();
+        }
+
+        async function removeItem(name) {
+            // Logic đơn giản để test: find item by name
+            const ordersRes = await fetch(`${API}/orders`);
+            const ordersData = await ordersRes.json();
+            const myOrder = ordersData.data.find(o => o.orderId === currentOrderId);
+            if (myOrder && myOrder.items.length > 0) {
+                await callCommand('ItemRemoved', currentOrderId, { productId: myOrder.items[0].productId });
+                showSync();
+                refreshOrders();
+            }
+        }
+
+        async function confirmOrder() {
+            await callCommand('OrderConfirmed', currentOrderId, {});
+            showSync();
+            refreshOrders();
+        }
+
+        async function callCommand(type, orderId, payload) {
+            try {
+                const res = await fetch(`${API}/commands`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, orderId, payload })
+                });
+                return await res.json();
+            } catch (err) { console.error(err); return { success: false }; }
+        }
+
+        async function refreshOrders() {
+            try {
+                const res = await fetch(`${API}/orders`);
+                const result = await res.json();
+                const grid = document.getElementById('orderGrid');
+                
+                if (result.data.length === 0) {
+                    grid.innerHTML = '<p class="col-span-full text-slate-700 italic text-center py-10">Waiting for first order event...</p>';
+                    return;
+                }
+
+                grid.innerHTML = result.data.map(order => `
+                    <div class="glass p-6 rounded-[2rem] border-white/5 hover:border-secondary/30 transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 class="font-black text-lg">${order.customerName}</h4>
+                                <p class="text-[10px] font-mono text-slate-500">${order.orderId.split('-')[0]}</p>
+                            </div>
+                            <span class="px-3 py-1 bg-secondary text-white text-[10px] font-black uppercase rounded-lg tracking-widest">${order.status}</span>
+                        </div>
+                        
+                        <div class="space-y-1 mb-6 max-h-[100px] overflow-y-auto custom-scrollbar">
+                            ${order.items.map(i => `
+                                <div class="flex justify-between text-xs py-1 border-b border-white/5 last:border-0 opacity-70">
+                                    <span>${i.name} x${i.quantity}</span>
+                                    <span>$${i.price * i.quantity}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <p class="text-[8px] uppercase text-slate-500 font-bold">Total Price</p>
+                                <p class="text-xl font-black text-white">$${order.totalPrice.toLocaleString()}</p>
+                            </div>
+                            <button onclick="viewEvents('${order.orderId}')" class="text-[10px] text-slate-400 hover:text-white underline">Audit Log</button>
+                        </div>
+                    </div>
+                `).reverse().join('');
+
+                // Update global log too
+                fetchGlobalLog();
+            } catch (err) { console.error(err); }
+        }
+
+        async function fetchGlobalLog() {
+            // Hiển thị stream events cho order hiện tại hoặc tất cả
+            const res = await fetch(`${API}/orders/${currentOrderId || 'all'}/events`);
+            const result = await res.json();
+            const log = document.getElementById('globalLog');
+            
+            log.innerHTML = result.data.map((e, idx) => `
+                <div class="flex items-center gap-4 text-[10px] p-2 hover:bg-white/5 rounded-lg transition-colors border-l-2 ${getEventColor(e.type)}">
+                    <span class="text-slate-600 font-mono w-4">${idx+1}</span>
+                    <span class="font-bold flex-1">${e.type}</span>
+                    <span class="text-slate-500">${new Date(e.occurredAt).toLocaleTimeString()}</span>
+                </div>
+            `).reverse().join('');
+        }
+
+        function getEventColor(type) {
+            if (type === 'OrderCreated') return 'border-blue-500 text-blue-400';
+            if (type === 'ItemAdded') return 'border-green-500 text-green-400';
+            if (type === 'ItemRemoved') return 'border-red-500 text-red-400';
+            if (type === 'OrderConfirmed') return 'border-amber-500 text-amber-400';
+            return 'border-slate-500 text-slate-500';
+        }
+
+        function showSync() {
+            const ind = document.getElementById('syncIndicator');
+            ind.classList.remove('hidden');
+            setTimeout(() => ind.classList.add('hidden'), 2000);
+        }
+
+        function resetUI() {
+            currentOrderId = null;
+            document.getElementById('createOrderSection').classList.remove('hidden');
+            document.getElementById('manageOrderSection').classList.add('hidden');
+            document.getElementById('custName').value = '';
+        }
+
+        async function viewEvents(id) {
+            currentOrderId = id;
+            fetchGlobalLog();
+            alert(`Selected order to show Audit Log: ${id}`);
+        }
+    </script>
+</body>
+</html>
