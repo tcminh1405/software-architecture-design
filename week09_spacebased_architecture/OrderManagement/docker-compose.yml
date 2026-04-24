@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # Lưới Tin nhắn (Messaging Grid - RabbitMQ)
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"   # Giao thức AMQP
+      - "15672:15672" # Giao diện Quản lý (User/Pass mặc định: guest/guest)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  # Lưới Dữ liệu (Data Grid - Redis)
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+
+  # Cơ sở dữ liệu Bền vững (Persistent Database - PostgreSQL)
+  postgres:
+    image: postgres:alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: sba_db
+    ports:
+      - "5432:5432"
+
+  # Công cụ Adminer để quản lý DB (Tùy chọn, giúp xem dữ liệu dễ dàng hơn)
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
