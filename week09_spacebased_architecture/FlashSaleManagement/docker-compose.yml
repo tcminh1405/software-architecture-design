@@ -1,0 +1,90 @@
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6380:6379"
+    networks:
+      - flashsale-net
+
+  product-service:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./product-service:/app
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - PORT=8081
+    command: sh -c "npm install && node index.js"
+    depends_on:
+      - redis
+    networks:
+      - flashsale-net
+
+  cart-service:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./cart-service:/app
+    ports:
+      - "8082:8082"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - PORT=8082
+    command: sh -c "npm install && node index.js"
+    depends_on:
+      - redis
+    networks:
+      - flashsale-net
+
+  order-service:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./order-service:/app
+    ports:
+      - "8083:8083"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - INVENTORY_SERVICE_URL=http://inventory-service:8084
+      - PORT=8083
+    command: sh -c "npm install && node index.js"
+    depends_on:
+      - redis
+      - inventory-service
+    networks:
+      - flashsale-net
+
+  inventory-service:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./inventory-service:/app
+    ports:
+      - "8084:8084"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - PORT=8084
+    command: sh -c "npm install && node index.js"
+    depends_on:
+      - redis
+    networks:
+      - flashsale-net
+
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm run dev -- --host"
+    depends_on:
+      - product-service
+    networks:
+      - flashsale-net
+
+networks:
+  flashsale-net:
+    driver: bridge

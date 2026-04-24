@@ -1,0 +1,19 @@
+{
+  "name": "flashsalemanagement",
+  "version": "1.0.0",
+  "description": "Dự án này mô phỏng một hệ thống Flash Sale chịu tải cao, sử dụng kiến trúc Space-Based để đạt hiệu năng tối đa bằng cách xử lý hoàn toàn trên RAM (Data Grid).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.15.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "redis": "^5.12.1"
+  }
+}
